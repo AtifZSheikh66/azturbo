@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>js-dos Player - Upload & Run</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #000;
+            color: #fff;
+        }
+        #dos-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        #dos {
+            width: 100%;
+            height: 500px;
+            background: #000;
+            border: 1px solid #333;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button, input {
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        input {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+        }
+        button {
+            background: #007acc;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #005a99;
+        }
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            padding: 5px;
+            background: #111;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://v8.js-dos.com/latest/js-dos.css">
+    <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
+</head>
+<body>
+    <div id="dos-container">
+        <div class="controls">
+            <input type="file" id="bundleUpload" accept=".jsdos,.zip">
+            <button id="loadDefault">Load Default (if available)</button>
+        </div>
+        <div id="dos"></div>
+        <div class="status" id="status">Ready - Upload a .jsdos or .zip file</div>
+    </div>
+
+    <script>
+        let ciPromise = null;
+        const dosDiv = document.getElementById("dos");
+        const statusDiv = document.getElementById("status");
+
+        function updateStatus(msg, isError = false) {
+            statusDiv.textContent = msg;
+            statusDiv.style.color = isError ? "#ff6666" : "#88ff88";
+            setTimeout(() => {
+                if (!isError) statusDiv.style.color = "#fff";
+            }, 3000);
+        }
+
+        async function loadBundle(bundleUrlOrData, isUrl = true) {
+            if (ciPromise) {
+                try {
+                    await ciPromise;
+                } catch(e) {}
+            }
+
+            updateStatus("Loading DOSBox...");
+            
+            try {
+                const dosInstance = Dos(dosDiv, {
+                    onload: () => {
+                        updateStatus("Loaded! Running emulator...");
+                    },
+                    onerror: (error) => {
+                        updateStatus("Error: " + error, true);
+                        console.error(error);
+                    }
+                });
+
+                ciPromise = dosInstance.ready();
+                await ciPromise;
+
+                updateStatus("Loading bundle...");
+                
+                if (isUrl) {
+                    await dosInstance.run(bundleUrlOrData);
+                } else {
+                    await dosInstance.run(bundleUrlOrData);
+                }
+                
+                updateStatus("Running! Use keyboard/mouse to interact");
+            } catch (error) {
+                updateStatus("Failed to load: " + error.message, true);
+                console.error(error);
+            }
+        }
+
+        // Handle file upload
+        document.getElementById("bundleUpload").addEventListener("change", async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            updateStatus(`Loading ${file.name}...`);
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const blob = new Blob([arrayBuffer]);
+                const url = URL.createObjectURL(blob);
+                
+                await loadBundle(url, true);
+                
+                // Clean up URL object after load
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (error) {
+                updateStatus("Upload failed: " + error.message, true);
+                console.error(error);
+            }
+        });
+
+        // Optional: Try to load a default bundle if exists
+        document.getElementById("loadDefault").addEventListener("click", async () => {
+            // Try to load default if you have a file named "turbo.jsdos" in same directory
+            try {
+                await loadBundle("turbo.jsdos", true);
+            } catch (error) {
+                updateStatus("No default bundle found. Please upload a file first.", true);
+            }
+        });
+
+        // Prevent pinch zoom on mobile
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+        
+        document.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) e.preventDefault();
+        }, { passive: false });
+
+        // Display ready message
+        updateStatus("Ready - Select a .jsdos or .zip file to play");
+    </script>
+</body>
+</html>
